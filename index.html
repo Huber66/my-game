@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐹 Q版打地鼠挑战 🐹</title>
+    <style>
+        /* 基础重置 */
+        * {
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', 'Microsoft YaHei', sans-serif;
+            background-color: #a8dadc;
+            text-align: center;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: auto; 
+        }
+
+        /* 游戏进行中样式 */
+        body.playing {
+            cursor: none !important; /* 隐藏系统鼠标 */
+        }
+
+        body.playing #custom-hammer {
+            display: block;
+        }
+
+        body.playing * {
+            cursor: none !important;
+        }
+
+        h1 {
+            color: #1d3557;
+            font-size: 2.2em; 
+            margin: 0 0 15px 0;
+        }
+
+        /* 控制面板样式 */
+        #ui-bar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 480px; 
+            margin-bottom: 15px; 
+            background: #f1faee;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 5;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .difficulty-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+
+        .stat {
+            font-size: 1.5em; 
+            color: #e63946;
+            font-weight: bold;
+        }
+
+        /* 模式切换按钮 */
+        .diff-btn {
+            background-color: #f1faee;
+            border: 2px solid #457b9d;
+            padding: 6px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 1em;
+            color: #457b9d;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        .diff-btn.active {
+            background-color: #457b9d;
+            color: white;
+        }
+
+        /* 核心控制按钮（开始/结束） */
+        button#control-btn {
+            background-color: #e63946;
+            color: white;
+            border: none;
+            padding: 12px 35px;
+            font-size: 1.3em;
+            border-radius: 10px;
+            transition: all 0.2s;
+            cursor: pointer;
+            box-shadow: 0 4px #c1121f;
+            font-weight: bold;
+            width: 200px;
+        }
+
+        button#control-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #c1121f;
+        }
+
+        button#control-btn.stop {
+            background-color: #d62828;
+            box-shadow: 0 4px #a81d1d;
+        }
+
+        /* 地鼠洞网格 */
+        #game-grid {
+            width: 360px;  
+            height: 360px; 
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 12px; 
+        }
+
+        .hole {
+            background-color: #8d6e63;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 8px 10px rgba(0,0,0,0.4); 
+            border: 4px solid #6d4c41; 
+        }
+
+        .mole {
+            font-size: 60px; 
+            position: absolute;
+            bottom: -90px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: bottom 0.2s ease-out; 
+        }
+
+        .mole.up {
+            bottom: 5px; 
+        }
+
+        /* 自定义木槌 SVG */
+        #custom-hammer {
+            display: none; 
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px; 
+            height: 80px;
+            pointer-events: none; 
+            z-index: 9999; 
+            transform: translate(-20%, -30%); 
+            transform-origin: 50% 90%; 
+            transition: transform 0.05s ease-in-out; 
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.3)); 
+        }
+
+        body:active #custom-hammer {
+            transform: translate(-20%, -30%) rotate(-50deg); 
+        }
+
+        /* 结算屏幕 */
+        #end-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.85);
+            color: #f1faee;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        #end-screen h2 { font-size: 3.5em; color: #e63946; margin-bottom: 10px; }
+        #end-screen p { font-size: 2em; margin-bottom: 25px; }
+        #end-screen button {
+            background-color: #457b9d; color: white; border: none;
+            padding: 15px 35px; font-size: 1.4em; border-radius: 12px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 游走的木槌 -->
+    <div id="custom-hammer">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <rect x="42" y="40" width="16" height="55" rx="8" fill="#d4a373" />
+            <rect x="42" y="40" width="8" height="55" rx="8" fill="#c08c5c" /> 
+            <path d="M 15 20 h 70 a 12 12 0 0 1 12 12 v 16 a 12 12 0 0 1 -12 12 h -70 a 12 12 0 0 1 -12 -12 v -16 a 12 12 0 0 1 12 -12 z" fill="#e07a5f"/>
+            <path d="M 15 20 h 70 a 12 12 0 0 1 12 12 v 6 a 0 0 0 0 1 0 0 h -94 a 0 0 0 0 1 0 0 v -6 a 12 12 0 0 1 12 -12 z" fill="#f29c83"/>
+            <rect x="20" y="20" width="6" height="40" fill="#c1664d" />
+            <rect x="74" y="20" width="6" height="40" fill="#c1664d" />
+        </svg>
+    </div>
+
+    <h1>🐹 打地鼠 挑战 🐹</h1>
+
+    <div id="ui-bar">
+        <div class="info-row">
+            <div class="stat">得分：<span id="score">0</span></div>
+            <div class="stat">时间：<span id="time">30</span>秒</div>
+        </div>
+        <div class="difficulty-row">
+            <button class="diff-btn active" id="btn-classic" onclick="setDifficulty('classic')">经典模式</button>
+            <button class="diff-btn" id="btn-challenge" onclick="setDifficulty('challenge')">挑战模式</button>
+        </div>
+        <button id="control-btn">开始挑战!</button>
+    </div>
+
+    <div id="game-grid">
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+    </div>
+
+    <div id="end-screen">
+        <h2 id="end-title">🎉 时间到！ 🎉</h2>
+        <div class="stat">最终得分：<span id="final-score">0</span></div>
+        <p id="end-msg">表现得真棒！继续加油！</p>
+        <button id="restart-btn" onclick="location.reload()">再来一次?</button>
+    </div>
+
+    <script>
+        // --- 鼠标/木槌同步 ---
+        const hammer = document.getElementById('custom-hammer');
+        document.addEventListener('mousemove', (e) => {
+            hammer.style.left = e.clientX + 'px';
+            hammer.style.top = e.clientY + 'px';
+        });
+
+        // --- 元素获取 ---
+        const scoreBoard = document.querySelector('#score');
+        const timerBoard = document.querySelector('#time');
+        const moles = document.querySelectorAll('.mole');
+        const controlBtn = document.querySelector('#control-btn');
+        const endScreen = document.querySelector('#end-screen');
+        const finalScore = document.querySelector('#final-score');
+        const diffBtns = document.querySelectorAll('.diff-btn');
+
+        // --- 模式核心参数 ---
+        const configs = {
+            classic:   { stay: 1000, totalMoles: 20, intervalBase: 1520, maxOnScreen: 1 }, 
+            challenge: { stay: 1000, check: 400, prob: 0.4, maxOnScreen: 2 }
+        };
+
+        let currentDiff = 'classic'; 
+        let lastHole;
+        let timeUp = false;
+        let score = 0;
+        let countdown;
+        let gameLoop; 
+        let spawnTimeout; 
+        let gameDuration = 30; 
+
+        // --- 难度选择 ---
+        function setDifficulty(level) {
+            if (document.body.classList.contains('playing')) return; 
+            currentDiff = level;
+            diffBtns.forEach(btn => {
+                btn.classList.toggle('active', 
+                    (level === 'classic' && btn.id === 'btn-classic') || 
+                    (level === 'challenge' && btn.id === 'btn-challenge')
+                );
+            });
+        }
+
+        // --- 地鼠弹出逻辑 ---
+        function getRandomHole() {
+            const index = Math.floor(Math.random() * moles.length);
+            const hole = moles[index];
+            if (hole === lastHole || hole.classList.contains('up')) return getRandomHole();
+            lastHole = hole;
+            return hole;
+        }
+
+        function popOneMole() {
+            if (timeUp) return;
+            const mole = getRandomHole();
+            const conf = configs[currentDiff];
+            
+            mole.classList.add('up');
+            const timeoutId = setTimeout(() => {
+                mole.classList.remove('up');
+                mole.textContent = '🐹';
+            }, conf.stay);
+            mole.dataset.timeoutId = timeoutId;
+        }
+
+        // --- 模式管理器 ---
+        function startManager() {
+            const conf = configs[currentDiff];
+            
+            if (currentDiff === 'classic') {
+                // 经典模式：29秒匀速产出20只
+                let molesSpawned = 0;
+                function spawnNext() {
+                    if (timeUp || molesSpawned >= conf.totalMoles) return;
+                    popOneMole();
+                    molesSpawned++;
+                    const jitter = Math.floor(Math.random() * 200) - 100;
+                    spawnTimeout = setTimeout(spawnNext, conf.intervalBase + jitter);
+                }
+                spawnNext();
+            } else {
+                // 挑战模式：每400ms概率检测
+                gameLoop = setInterval(() => {
+                    if (timeUp) {
+                        clearInterval(gameLoop);
+                        return;
+                    }
+                    const activeCount = document.querySelectorAll('.mole.up').length;
+                    if (activeCount < conf.maxOnScreen) {
+                        if (Math.random() > conf.prob) popOneMole();
+                    }
+                }, conf.check);
+            }
+        }
+
+        // --- 核心控制：开始/结束 ---
+        controlBtn.addEventListener('click', () => {
+            if (document.body.classList.contains('playing')) {
+                endGame(); // 强行结束
+            } else {
+                startGame(); // 开始游戏
+            }
+        });
+
+        function startGame() {
+            document.body.classList.add('playing');
+            controlBtn.textContent = '结束游戏';
+            controlBtn.classList.add('stop');
+
+            scoreBoard.textContent = 0;
+            timerBoard.textContent = gameDuration;
+            timerBoard.style.color = "#e63946";
+            timeUp = false;
+            score = 0;
+            endScreen.style.display = 'none';
+            
+            startManager(); 
+
+            clearInterval(countdown);
+            countdown = setInterval(() => {
+                const timeLeft = parseInt(timerBoard.textContent);
+                if (timeLeft <= 1) {
+                    endGame(); // 时间走完正常结束
+                } else {
+                    timerBoard.textContent = timeLeft - 1;
+                    if (timeLeft <= 5) timerBoard.style.color = "#ff0000";
+                }
+            }, 1000);
+        }
+
+        // --- 击打动作 ---
+        function whack(e) {
+            if (!e.isTrusted || timeUp || !this.classList.contains('up')) return;
+            clearTimeout(this.dataset.timeoutId);
+            score++;
+            scoreBoard.textContent = score;
+            this.textContent = '😵'; 
+            this.classList.remove('up');
+            setTimeout(() => { this.textContent = '🐹'; }, 200);
+        }
+
+        // --- 结束逻辑 ---
+        function endGame() {
+            document.body.classList.remove('playing');
+            controlBtn.textContent = '开始挑战!';
+            controlBtn.classList.remove('stop');
+            timeUp = true;
+            
+            clearInterval(gameLoop);
+            clearInterval(countdown);
+            clearTimeout(spawnTimeout);
+            
+            // 强制清理
+            moles.forEach(m => {
+                m.classList.remove('up');
+                if (m.dataset.timeoutId) clearTimeout(m.dataset.timeoutId);
+                m.textContent = '🐹';
+            });
+            
+            finalScore.textContent = score;
+            endScreen.style.display = 'flex';
+        }
+
+        moles.forEach(mole => mole.addEventListener('click', whack));
+    </script>
+</body>
+</html>
